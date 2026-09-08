@@ -1,4 +1,4 @@
-const CACHE_NAME = "ouencho-v02";
+const CACHE_NAME = "const CACHE_NAME = "ouencho-v03";;
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
