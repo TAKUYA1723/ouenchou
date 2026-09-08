@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>応援帳 正式版 v0.2</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+header{background:#111827;color:#fff;padding:17px 16px calc(17px + env(safe-area-inset-top));position:sticky;top:0;z-index:5}
+header b{font-size:21px}header small{color:#cbd5e1;font-size:12px}
+main{max-width:820px;margin:auto;padding:14px 14px 100px}.page{display:none}.page.active{display:block}
+h2{font-size:27px;margin:12px 2px 16px}.sub{font-size:13px;color:#6b7280;margin-top:-9px;margin-bottom:14px}
+.card,.item{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:0 1px 2px #00000008}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kpi{font-size:24px;font-weight:900;margin-top:4px}.label{color:#6b7280;font-size:13px;font-weight:700}
+input,select,textarea{width:100%;padding:12px;border:1px solid #cfd5dd;border-radius:11px;font-size:16px;margin-bottom:9px;background:#fff;color:#111827}
+textarea{min-height:75px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button{padding:12px 14px;border:0;border-radius:11px;font-weight:800;font-size:15px;cursor:pointer}
+button.primary{background:#111827;color:#fff}button.secondary{background:#eef2f7;color:#111827}button.danger{background:#fee2e2;color:#991b1b}
+button.good{background:#dcfce7;color:#166534}.actions{display:flex;gap:8px;flex-wrap:wrap}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #ddd;display:flex;overflow-x:auto;z-index:10;padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:#fff;color:#555;min-width:76px;border-radius:0;padding:12px 8px 10px}nav button.active{color:#111;font-weight:900}
+.badge{display:inline-block;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;background:#eef2f7;margin-left:5px}.badge.ok{background:#dcfce7;color:#166534}
+.big{font-size:31px;font-weight:950;text-align:center;margin:8px}.muted{color:#6b7280}.warn{background:#fff7ed;border-color:#fed7aa}.success{background:#f0fdf4;border-color:#bbf7d0}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:9px 5px;border-bottom:1px solid #eee}th{color:#6b7280}
+hr{border:0;border-top:1px solid #e5e7eb;margin:13px 0}.hide{display:none}
+@media(max-width:430px){.grid{gap:8px}.kpi{font-size:22px}h2{font-size:25px}}
+@media print{header,nav,.no-print{display:none!important}body{background:#fff}.page{display:none!important}#invoice{display:block!important}main{padding:0}.card{box-shadow:none;border:0}}
+</style>
+</head>
+<body>
+<header><b>応援帳</b><br><small>正式版 v0.2｜現場→日報→経費→利益→請求</small></header>
+<main>
+
+<section id="home" class="page active">
+<h2>今月の状況</h2>
+<div class="row"><select id="monthSelect" onchange="render()"></select><button class="secondary" onclick="quickDaily()">＋今日の日報</button></div>
+<div class="grid">
+<div class="card"><div class="label">売上</div><div id="sales" class="kpi">¥0</div></div>
+<div class="card"><div class="label">経費</div><div id="expenses" class="kpi">¥0</div></div>
+<div class="card"><div class="label">粗利益目安</div><div id="profit" class="kpi">¥0</div></div>
+<div class="card"><div class="label">人工</div><div id="days" class="kpi">0</div></div>
+</div>
+<div id="homeAdvice" class="card">まず現場と日報を登録。</div>
+<div class="card"><div class="label">今月の現場別売上</div><div id="siteSummary"></div></div>
+</section>
+
+<section id="sites" class="page">
+<h2>現場・取引先</h2><p class="sub">一度登録すれば、日報では選ぶだけ。</p>
+<div class="card">
+<input id="client" placeholder="取引先名（例：○○株式会社）">
+<input id="site" placeholder="現場名（例：○○解体現場）">
+<div class="row"><input id="rate" type="number" inputmode="numeric" placeholder="基本人工単価"><input id="siteNote" placeholder="メモ（任意）"></div>
+<button class="primary" onclick="addSite()">現場を登録</button>
+</div>
+<div id="siteList"></div>
+</section>
+
+<section id="daily" class="page">
+<h2>日報・人工</h2><p class="sub">現場・人工・単価を入れるだけで売上を自動計算。</p>
+<div class="card">
+<input id="date" type="date">
+<select id="siteSelect"></select>
+<div class="row"><input id="workDays" type="number" step=".25" inputmode="decimal" placeholder="人工（例 1）"><input id="dailyRate" type="number" inputmode="numeric" placeholder="単価"></div>
+<textarea id="work" placeholder="作業内容・備考"></textarea>
+<button class="primary" onclick="addDaily()">日報を登録</button>
+</div>
+<div id="dailyList"></div>
+</section>
+
+<section id="expense" class="page">
+<h2>経費</h2><p class="sub">ガソリン・高速・工具などを記録。</p>
+<div class="card">
+<input id="expDate" type="date">
+<div class="row"><select id="expCategory"><option>燃料</option><option>高速・交通</option><option>工具・資材</option><option>駐車場</option><option>通信</option><option>その他</option></select><input id="amount" type="number" inputmode="numeric" placeholder="金額"></div>
+<input id="memo" placeholder="内容（例：鹿児島→○○ 高速）">
+<button class="primary" onclick="addExp()">経費を登録</button>
+</div>
+<div id="expList"></div>
+</section>
+
+<section id="invoice" class="page">
+<h2>請求書</h2><p class="sub">今月分を集計。印刷画面からPDF保存もできます。</p>
+<div class="card no-print">
+<input id="invoiceClient" placeholder="請求先（空欄なら全取引先）">
+<input id="issuer" placeholder="発行者名・屋号">
+<input id="invoiceNo" placeholder="インボイス登録番号（任意）">
+<div class="row"><input id="invoiceDate" type="date"><select id="taxRate"><option value="10">消費税10%</option><option value="8">消費税8%</option></select></div>
+<div class="actions"><button class="primary" onclick="makeInvoice()">請求書を作成</button><button class="secondary" onclick="window.print()">PDF/印刷</button></div>
+</div>
+<div id="preview" class="card">ここに請求書プレビューが出ます。</div>
+</section>
+
+<section id="diagnosis" class="page">
+<h2>単価診断</h2><p class="sub">「この応援、受けて大丈夫？」を数字で確認。</p>
+<div class="card">
+<div class="row"><input id="pRate" type="number" inputmode="numeric" placeholder="単価／人工"><input id="pDays" type="number" step=".25" inputmode="decimal" placeholder="月人工"></div>
+<div class="row"><input id="fuel" type="number" inputmode="numeric" placeholder="交通・燃料／月"><input id="other" type="number" inputmode="numeric" placeholder="その他経費／月"></div>
+<input id="target" type="number" inputmode="numeric" placeholder="目標として残したい金額／月（任意）">
+<button class="primary" onclick="diagnose()">診断する</button>
+<div id="result"></div>
+</div>
+</section>
+
+<section id="settings" class="page">
+<h2>設定・データ</h2>
+<div class="card">
+<h3>事業者情報</h3>
+<input id="bizName" placeholder="屋号・氏名">
+<input id="bizAddress" placeholder="住所（任意）">
+<input id="bizReg" placeholder="インボイス登録番号（任意）">
+<button class="primary" onclick="saveSettings()">保存</button>
+</div>
+<div class="card">
+<h3>バックアップ</h3>
+<div class="actions"><button class="secondary" onclick="backup()">JSONバックアップ</button><button class="secondary" onclick="exportCSV()">日報CSV</button><button class="danger" onclick="resetDB()">全データ削除</button></div>
+<p class="muted">v0.2は端末内保存です。正式サービスではログイン・クラウド同期・自動バックアップ・権限管理・セキュリティを追加します。</p>
+</div>
+</section>
+</main>
+
+<nav>
+<button class="active" onclick="go('home',this)">ホーム</button>
+<button onclick="go('sites',this)">現場</button>
+<button onclick="go('daily',this)">日報</button>
+<button onclick="go('expense',this)">経費</button>
+<button onclick="go('invoice',this)">請求</button>
+<button onclick="go('diagnosis',this)">単価</button>
+<button onclick="go('settings',this)">設定</button>
+</nav>
+
+<script>
+const KEY="ouencho_v02";
+let old=JSON.parse(localStorage.getItem("ouencho_v01")||'null');
+let db=JSON.parse(localStorage.getItem(KEY)||'null')||old||{sites:[],daily:[],expenses:[],settings:{}};
+db.sites=db.sites||[];db.daily=db.daily||[];db.expenses=db.expenses||[];db.settings=db.settings||{};
+const todayStr=()=>new Date().toISOString().slice(0,10);
+date.value=todayStr();expDate.value=todayStr();invoiceDate.value=todayStr();
+monthSelect.value=todayStr().slice(0,7);
+
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function yen(n){return"¥"+Math.round(n||0).toLocaleString()}
+function esc(s){return String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]))}
+function ym(){return monthSelect.value||todayStr().slice(0,7)}
+function go(id,b){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");render()}
+function quickDaily(){go("daily",document.querySelectorAll("nav button")[2])}
+function addSite(){if(!client.value.trim()||!site.value.trim())return alert("取引先と現場名を入力してください");db.sites.push({id:Date.now(),client:client.value.trim(),site:site.value.trim(),rate:+rate.value||0,note:siteNote.value.trim()});client.value=site.value=rate.value=siteNote.value="";save()}
+function addDaily(){let s=db.sites.find(x=>String(x.id)===String(siteSelect.value));if(!s||!workDays.value)return alert("現場と人工を入力してください");db.daily.push({id:Date.now(),date:date.value||todayStr(),site:s.id,days:+workDays.value,rate:+dailyRate.value||s.rate,work:work.value.trim()});workDays.value=dailyRate.value=work.value="";save();alert("日報を登録しました")}
+function addExp(){if(!amount.value)return alert("金額を入力してください");db.expenses.push({id:Date.now(),date:expDate.value||todayStr(),amount:+amount.value,category:expCategory.value,memo:memo.value.trim()});amount.value=memo.value="";save();alert("経費を登録しました")}
+function del(t,id){if(confirm("削除しますか？")){db[t]=db[t].filter(x=>x.id!=id);save()}}
+function render(){
+let m=ym();
+let months=new Set([todayStr().slice(0,7),...db.daily.map(x=>x.date.slice(0,7)),...db.expenses.map(x=>x.date.slice(0,7))]);
+monthSelect.innerHTML=[...months].sort().reverse().map(x=>`<option value="${x}">${x.replace("-","年")}月</option>`).join("");
+if(![...months].includes(m))monthSelect.value=todayStr().slice(0,7);else monthSelect.value=m;m=monthSelect.value;
+siteSelect.innerHTML='<option value="">現場を選択</option>'+db.sites.map(s=>`<option value="${s.id}">${esc(s.client)} / ${esc(s.site)}</option>`).join("");
+siteList.innerHTML=db.sites.map(s=>`<div class="item"><b>${esc(s.client)}｜${esc(s.site)}</b>${s.rate?`<span class="badge">${yen(s.rate)}/人工</span>`:""}<div class="muted">${esc(s.note||"")}</div><br><button class="danger" onclick="del('sites',${s.id})">削除</button></div>`).join("")||'<div class="card">現場がまだありません。</div>';
+let d=db.daily.filter(x=>x.date.startsWith(m)),e=db.expenses.filter(x=>x.date.startsWith(m));
+dailyList.innerHTML=db.daily.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>{let s=db.sites.find(a=>a.id==x.site);return`<div class="item"><b>${x.date}｜${esc(s?.site||"削除済み現場")}</b><div class="muted">${esc(s?.client||"")} / ${esc(x.work||"")}</div><div>${x.days}人工 × ${yen(x.rate)} = <b>${yen(x.days*x.rate)}</b></div><button class="danger" onclick="del('daily',${x.id})">削除</button></div>`}).join("")||'<div class="card">日報なし</div>';
+expList.innerHTML=db.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="item"><b>${x.date}｜${esc(x.category)}</b><div>${esc(x.memo||"")} <b style="float:right">${yen(x.amount)}</b></div><br><button class="danger" onclick="del('expenses',${x.id})">削除</button></div>`).join("")||'<div class="card">経費なし</div>';
+let salesN=d.reduce((a,x)=>a+x.days*x.rate,0),expN=e.reduce((a,x)=>a+x.amount,0),profitN=salesN-expN,daysN=d.reduce((a,x)=>a+x.days,0);
+sales.textContent=yen(salesN);expenses.textContent=yen(expN);profit.textContent=yen(profitN);days.textContent=daysN;
+homeAdvice.className="card "+(profitN>=0?"success":"warn");
+homeAdvice.innerHTML=d.length?`<b>${m.replace("-","年")}月の状態</b><br>売上 ${yen(salesN)} − 経費 ${yen(expN)} ＝ <b>${yen(profitN)}</b><br><span class="muted">${daysN}人工・${d.length}件の日報</span>`:"まず現場を登録して、日報を1件入れてみよう。";
+let map={};d.forEach(x=>{let s=db.sites.find(a=>a.id==x.site),k=s?.site||"削除済み";map[k]=(map[k]||0)+x.days*x.rate});
+siteSummary.innerHTML=Object.entries(map).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee"><span>${esc(k)}</span><b>${yen(v)}</b></div>`).join("")||'<span class="muted">まだ売上データがありません。</span>';
+bizName.value=db.settings.bizName||"";bizAddress.value=db.settings.bizAddress||"";bizReg.value=db.settings.bizReg||"";
+}
+function makeInvoice(){
+let m=ym(),c=invoiceClient.value.trim(),rows=db.daily.filter(x=>x.date.startsWith(m)).filter(x=>!c||db.sites.find(s=>s.id==x.site)?.client==c);
+let sub=rows.reduce((a,x)=>a+x.days*x.rate,0),r=+taxRate.value/100,tax=Math.floor(sub*r),total=sub+tax;
+let grouped={};rows.forEach(x=>{let s=db.sites.find(a=>a.id==x.site);let k=s?.site||"現場";grouped[k]=(grouped[k]||0)+x.days*x.rate});
+preview.innerHTML=`<div><h1 style="text-align:center">請求書</h1><p>${esc(c||"取引先")} 御中</p><p>発行日：${esc(invoiceDate.value)}<br>発行者：${esc(issuer.value||db.settings.bizName||"未設定")}<br>${esc(db.settings.bizAddress||"")}<br>登録番号：${esc(invoiceNo.value||db.settings.bizReg||"未設定")}</p><hr><table><tr><th>内容</th><th>金額</th></tr>${Object.entries(grouped).map(([k,v])=>`<tr><td>${esc(m)}｜${esc(k)} 応援人工</td><td>${yen(v)}</td></tr>`).join("")||'<tr><td>該当取引なし</td><td>¥0</td></tr>'}<tr><th>税抜合計</th><th>${yen(sub)}</th></tr><tr><th>消費税 ${+taxRate.value}%</th><th>${yen(tax)}</th></tr><tr><th style="font-size:18px">請求額</th><th style="font-size:22px">${yen(total)}</th></tr></table><p class="muted">※v0.2は請求書のたたき台です。実運用では適格請求書の記載要件・端数処理・取引内容を確認してから使用してください。</p></div>`;
+}
+function diagnose(){
+let r=+pRate.value||0,d=+pDays.value||0,c=(+fuel.value||0)+(+other.value||0),salesN=r*d,net=salesN-c,targetN=+target.value||0,per=d?net/d:0,need=targetN?Math.ceil((targetN+c)/Math.max(d,1)):0;
+let cls=net<0?"warn":per<8000?"warn":"success";
+result.innerHTML=`<div class="card ${cls}"><div class="big">${yen(per)} / 人工</div><p>月売上 <b>${yen(salesN)}</b><br>経費 <b>${yen(c)}</b><br>差引 <b>${yen(net)}</b></p>${targetN?`<hr><p>目標残額 ${yen(targetN)} を残すには、必要単価の目安：<b>${yen(need)}</b> / 人工</p>`:""}<b>${net<0?"⚠️ この条件だと赤字です。":per<8000?"⚠️ 利益が薄めです。単価・人工・経費を見直そう。":"✅ ひとまず利益は確保できる計算です。"}</b></div>`;
+}
+function saveSettings(){db.settings={bizName:bizName.value.trim(),bizAddress:bizAddress.value.trim(),bizReg:bizReg.value.trim()};save();alert("保存しました")}
+function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ouencho-backup.json";a.click();URL.revokeObjectURL(a.href)}
+function exportCSV(){let lines=["日付,取引先,現場,人工,単価,売上,作業内容"];db.daily.forEach(x=>{let s=db.sites.find(a=>a.id==x.site);lines.push([x.date,s?.client||"",s?.site||"",x.days,x.rate,x.days*x.rate,x.work||""].map(v=>`"${String(v).replaceAll('"','""')}"`).join(","))});let blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ouencho-nippo.csv";a.click()}
+function resetDB(){if(confirm("全データを削除します。本当に実行しますか？")){db={sites:[],daily:[],expenses:[],settings:{}};save()}}
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
+render();
+</script>
+</body>
+</html>
