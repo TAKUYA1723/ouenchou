@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>応援帳 正式版 v0.3</title>
+<title>応援帳 v0.3.1 修正版</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
 header{background:#111827;color:#fff;padding:17px 16px calc(17px + env(safe-area-inset-top));position:sticky;top:0;z-index:5}
@@ -30,7 +30,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:13px 0}.hide{display:none}
 </style>
 </head>
 <body>
-<header><b>応援帳</b><br><small>正式版 v0.3｜現場→日報→経費→利益→請求</small></header>
+<header><b>応援帳</b><br><small>v0.3.1 修正版｜現場→日報→経費→利益→請求</small></header>
 <main>
 
 <section id="home" class="page active">
@@ -88,7 +88,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:13px 0}.hide{display:none}
 <input id="issuer" placeholder="発行者名・屋号">
 <input id="invoiceNo" placeholder="インボイス登録番号（任意）">
 <div class="row"><input id="invoiceDate" type="date"><select id="taxRate"><option value="10">消費税10%</option><option value="8">消費税8%</option></select></div>
-<div class="actions"><button class="primary" onclick="makeInvoice()">請求書を作成</button><button class="secondary" onclick="window.print()">PDF/印刷</button></div>
+<div class="actions"><button class="primary" onclick="makeInvoice()">請求書を作成</button><button class="secondary" onclick="printInvoice()">PDF/印刷</button></div>
 </div>
 <div id="preview" class="card">ここに請求書プレビューが出ます。</div>
 </section>
@@ -133,6 +133,7 @@ hr{border:0;border-top:1px solid #e5e7eb;margin:13px 0}.hide{display:none}
 
 <script>
 const KEY="ouencho_v03";
+let editingDailyId=null,editingExpId=null;
 let old=JSON.parse(localStorage.getItem("ouencho_v02")||'null')||JSON.parse(localStorage.getItem("ouencho_v01")||'null');
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||old||{sites:[],daily:[],expenses:[],settings:{}};
 db.sites=db.sites||[];db.daily=db.daily||[];db.expenses=db.expenses||[];db.settings=db.settings||{};
@@ -147,11 +148,18 @@ function ym(){return monthSelect.value||todayStr().slice(0,7)}
 function go(id,b){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");render()}
 function quickDaily(){go("daily",document.querySelectorAll("nav button")[2])}
 function addSite(){if(!client.value.trim()||!site.value.trim())return alert("取引先と現場名を入力してください");db.sites.push({id:Date.now(),client:client.value.trim(),site:site.value.trim(),rate:+rate.value||0,note:siteNote.value.trim(),closingDay:+closingDay.value||0,paymentDay:+paymentDay.value||0});client.value=site.value=rate.value=siteNote.value=closingDay.value=paymentDay.value="";save()}
-function addDaily(){let s=db.sites.find(x=>String(x.id)===String(siteSelect.value));if(!s||!workDays.value)return alert("現場と人工を入力してください");db.daily.push({id:Date.now(),date:date.value||todayStr(),site:s.id,days:+workDays.value,rate:+dailyRate.value||s.rate,work:work.value.trim()});workDays.value=dailyRate.value=work.value="";save();alert("日報を登録しました")}
-function addExp(){if(!amount.value)return alert("金額を入力してください");db.expenses.push({id:Date.now(),date:expDate.value||todayStr(),amount:+amount.value,category:expCategory.value,memo:memo.value.trim()});amount.value=memo.value="";save();alert("経費を登録しました")}
-function del(t,id){if(confirm("削除しますか？")){db[t]=db[t].filter(x=>x.id!=id);save()}}
-function editDaily(id){let x=db.daily.find(a=>a.id==id);if(!x)return;date.value=x.date;siteSelect.value=x.site;workDays.value=x.days;dailyRate.value=x.rate;work.value=x.work||"";db.daily=db.daily.filter(a=>a.id!=id);go("daily",document.querySelectorAll("nav button")[2]);alert("内容を直して『日報を登録』を押してください") }
-function editExp(id){let x=db.expenses.find(a=>a.id==id);if(!x)return;expDate.value=x.date;expCategory.value=x.category;amount.value=x.amount;memo.value=x.memo||"";db.expenses=db.expenses.filter(a=>a.id!=id);go("expense",document.querySelectorAll("nav button")[3]);alert("内容を直して『経費を登録』を押してください") }
+function addDaily(){let s=db.sites.find(x=>String(x.id)===String(siteSelect.value));if(!s||!workDays.value)return alert("現場と人工を入力してください");let data={id:editingDailyId||Date.now(),date:date.value||todayStr(),site:s.id,days:+workDays.value,rate:+dailyRate.value||s.rate,work:work.value.trim()};if(editingDailyId){let i=db.daily.findIndex(x=>x.id==editingDailyId);if(i>=0)db.daily[i]=data;editingDailyId=null}else db.daily.push(data);workDays.value=dailyRate.value=work.value="";save();alert("日報を保存しました")}
+function addExp(){if(!amount.value)return alert("金額を入力してください");let data={id:editingExpId||Date.now(),date:expDate.value||todayStr(),amount:+amount.value,category:expCategory.value,memo:memo.value.trim()};if(editingExpId){let i=db.expenses.findIndex(x=>x.id==editingExpId);if(i>=0)db.expenses[i]=data;editingExpId=null}else db.expenses.push(data);amount.value=memo.value="";save();alert("経費を保存しました")}
+function del(t,id){
+ if(t==="sites"){
+   let linked=db.daily.filter(x=>x.site==id).length;
+   if(linked){alert(`この現場には日報が${linked}件紐づいているため削除できません。先に該当の日報を削除してください。`);return;}
+ }
+ let label=t==="daily"?"この日報":t==="expenses"?"この経費":"この現場";
+ if(confirm(`${label}を削除しますか？`)){db[t]=db[t].filter(x=>x.id!=id);save();alert("削除しました")}
+}
+function editDaily(id){let x=db.daily.find(a=>a.id==id);if(!x)return;editingDailyId=id;date.value=x.date;siteSelect.value=x.site;workDays.value=x.days;dailyRate.value=x.rate;work.value=x.work||"";go("daily",document.querySelectorAll("nav button")[2]);alert("内容を直して『日報を登録』を押してください。保存するまで元データは消えません") }
+function editExp(id){let x=db.expenses.find(a=>a.id==id);if(!x)return;editingExpId=id;expDate.value=x.date;expCategory.value=x.category;amount.value=x.amount;memo.value=x.memo||"";go("expense",document.querySelectorAll("nav button")[3]);alert("内容を直して『経費を登録』を押してください。保存するまで元データは消えません") }
 function render(){
 let m=ym();
 let months=new Set([todayStr().slice(0,7),...db.daily.map(x=>x.date.slice(0,7)),...db.expenses.map(x=>x.date.slice(0,7))]);
@@ -176,6 +184,13 @@ let sub=rows.reduce((a,x)=>a+x.days*x.rate,0),r=+taxRate.value/100,tax=Math.floo
 let grouped={};rows.forEach(x=>{let s=db.sites.find(a=>a.id==x.site);let k=s?.site||"現場";grouped[k]=(grouped[k]||0)+x.days*x.rate});
 preview.innerHTML=`<div><h1 style="text-align:center">請求書</h1><p>${esc(c||"取引先")} 御中</p><p>発行日：${esc(invoiceDate.value)}<br>発行者：${esc(issuer.value||db.settings.bizName||"未設定")}<br>${esc(db.settings.bizAddress||"")}<br>登録番号：${esc(invoiceNo.value||db.settings.bizReg||"未設定")}</p><hr><table><tr><th>内容</th><th>金額</th></tr>${Object.entries(grouped).map(([k,v])=>`<tr><td>${esc(m)}｜${esc(k)} 応援人工</td><td>${yen(v)}</td></tr>`).join("")||'<tr><td>該当取引なし</td><td>¥0</td></tr>'}<tr><th>税抜合計</th><th>${yen(sub)}</th></tr><tr><th>消費税 ${+taxRate.value}%</th><th>${yen(tax)}</th></tr><tr><th style="font-size:18px">請求額</th><th style="font-size:22px">${yen(total)}</th></tr></table><p class="muted">※v0.3は請求書のたたき台です。実運用では適格請求書の記載要件・端数処理・取引内容を確認してから使用してください。</p></div>`;
 }
+function printInvoice(){
+ if(!preview.innerText||preview.innerText.includes("ここに請求書プレビュー")){alert("先に『請求書を作成』を押してください");return}
+ const w=window.open("","_blank");
+ if(!w){alert("印刷画面を開けませんでした。Safariで開いて、ポップアップを許可してからもう一度お試しください。");return}
+ const css=`@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;color:#111;margin:0}h1{text-align:center;font-size:28px;margin:0 0 24px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 6px;border-bottom:1px solid #ddd;text-align:left}.muted{color:#666;font-size:11px}hr{border:0;border-top:1px solid #bbb;margin:16px 0}`;
+ w.document.open();w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>応援帳_請求書</title><style>${css}</style></head><body>${preview.innerHTML}<script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script></body></html>`);w.document.close();
+}
 function diagnose(){
 let r=+pRate.value||0,d=+pDays.value||0,c=(+fuel.value||0)+(+other.value||0),salesN=r*d,net=salesN-c,targetN=+target.value||0,per=d?net/d:0,need=targetN?Math.ceil((targetN+c)/Math.max(d,1)):0;
 let cls=net<0?"warn":per<8000?"warn":"success";
@@ -186,7 +201,7 @@ function saveTarget(){db.settings={...db.settings,monthlyTarget:+monthlyTarget.v
 function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ouencho-backup.json";a.click();URL.revokeObjectURL(a.href)}
 function exportCSV(){let lines=["日付,取引先,現場,人工,単価,売上,作業内容"];db.daily.forEach(x=>{let s=db.sites.find(a=>a.id==x.site);lines.push([x.date,s?.client||"",s?.site||"",x.days,x.rate,x.days*x.rate,x.work||""].map(v=>`"${String(v).replaceAll('"','""')}"`).join(","))});let blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ouencho-nippo.csv";a.click()}
 function resetDB(){if(confirm("全データを削除します。本当に実行しますか？")){db={sites:[],daily:[],expenses:[],settings:{}};save()}}
-if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
+
 render();
 </script>
 </body>
